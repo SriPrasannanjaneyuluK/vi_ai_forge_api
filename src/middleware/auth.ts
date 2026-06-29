@@ -3,10 +3,17 @@ import { supabase } from "../lib/supabase.js";
 
 export type UserRole = "admin" | "teacher" | "student" | "user";
 
+function readFullName(metadata: Record<string, unknown> | undefined) {
+  const value = metadata?.full_name;
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
 export interface AuthUser {
   id: string;
   email: string;
   role: UserRole;
+  fullName?: string;
+  accessRevoked: boolean;
 }
 
 declare global {
@@ -43,10 +50,17 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     return;
   }
 
+  if (profile.access_revoked) {
+    res.status(403).json({ error: "Your account access has been revoked" });
+    return;
+  }
+
   req.user = {
     id: data.user.id,
     email: profile.email,
     role: profile.role,
+    fullName: readFullName(data.user.user_metadata),
+    accessRevoked: profile.access_revoked,
   };
 
   next();
@@ -71,7 +85,7 @@ async function getOrCreateProfile(userId: string, email: string) {
   const row = Array.isArray(data) ? data[0] : data;
   if (!row) return null;
 
-  return row as { role: UserRole; email: string };
+  return row as { role: UserRole; email: string; access_revoked: boolean };
 }
 
 export function requireAdmin(req: Request, res: Response, next: NextFunction) {

@@ -8,6 +8,7 @@ import { waitlistRouter } from "./routes/waitlist.js";
 import { contactRouter } from "./routes/contact.js";
 import { authRouter } from "./routes/auth.js";
 import { adminCoursesRouter } from "./routes/admin/courses.js";
+import { adminUsersRouter } from "./routes/admin/users.js";
 
 const app = express();
 
@@ -27,6 +28,7 @@ app.use("/api/waitlist", waitlistRouter);
 app.use("/api/contact", contactRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/admin/courses", adminCoursesRouter);
+app.use("/api/admin/users", adminUsersRouter);
 
 app.use(
   (
