@@ -1,4 +1,5 @@
 import "dotenv/config";
+import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
 import { ZodError } from "zod";
@@ -15,8 +16,10 @@ const app = express();
 app.use(
   cors({
     origin: env.CORS_ORIGIN.split(",").map((origin) => origin.trim()),
+    credentials: true,
   })
 );
+app.use(cookieParser());
 app.use(express.json());
 
 app.get("/api/health", (_req, res) => {
