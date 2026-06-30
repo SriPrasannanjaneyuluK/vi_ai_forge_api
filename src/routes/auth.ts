@@ -1,7 +1,19 @@
 import { Router } from "express";
 import { z } from "zod";
 import { requireAuth } from "../middleware/auth.js";
-import { portalForgotPassword, portalLogin, portalSignup } from "../services/portalAuth.js";
+import {
+  clearRefreshCookie,
+  readRefreshCookie,
+  setRefreshCookie,
+} from "../lib/sessionCookies.js";
+import {
+  portalForgotPassword,
+  portalLogin,
+  portalLogout,
+  portalRefresh,
+  portalSignup,
+  portalUpdateProfile,
+} from "../services/portalAuth.js";
 
 export const authRouter = Router();
 
@@ -29,7 +41,11 @@ authRouter.post("/login", async (req, res) => {
     return;
   }
 
-  res.json({ session: result.session, user: result.user });
+  setRefreshCookie(res, result.session.refresh_token);
+  res.json({
+    access_token: result.session.access_token,
+    user: result.user,
+  });
 });
 
 const forgotPasswordSchema = z.object({
@@ -81,7 +97,58 @@ authRouter.post("/signup", async (req, res) => {
     return;
   }
 
-  res.status(201).json({ session: result.session, user: result.user });
+  setRefreshCookie(res, result.session.refresh_token);
+  res.status(201).json({
+    access_token: result.session.access_token,
+    user: result.user,
+  });
+});
+
+authRouter.post("/refresh", async (req, res) => {
+  const refreshToken = readRefreshCookie(req);
+  if (!refreshToken) {
+    res.status(401).json({ error: "No refresh session" });
+    return;
+  }
+
+  const result = await portalRefresh(refreshToken);
+  if (!result.ok) {
+    clearRefreshCookie(res);
+    res.status(401).json({ error: "Invalid or expired session" });
+    return;
+  }
+
+  setRefreshCookie(res, result.refresh_token);
+  res.json({ access_token: result.access_token });
+});
+
+authRouter.post("/logout", async (req, res) => {
+  const refreshToken = readRefreshCookie(req);
+  if (refreshToken) {
+    await portalLogout(refreshToken);
+  }
+  clearRefreshCookie(res);
+  res.json({ ok: true });
+});
+
+const updateProfileSchema = z.object({
+  fullName: z.string().min(1),
+});
+
+authRouter.patch("/me", requireAuth, async (req, res) => {
+  const parsed = updateProfileSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Please enter a valid name." });
+    return;
+  }
+
+  const result = await portalUpdateProfile(req.user!.id, parsed.data.fullName);
+  if (!result.ok) {
+    res.status(400).json({ error: result.error });
+    return;
+  }
+
+  res.json({ user: result.user });
 });
 
 authRouter.get("/me", requireAuth, (req, res) => {

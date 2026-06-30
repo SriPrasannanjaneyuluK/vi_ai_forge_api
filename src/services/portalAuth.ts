@@ -196,3 +196,62 @@ export async function portalForgotPassword(
 
   return { ok: true as const };
 }
+
+export async function portalRefresh(refreshToken: string) {
+  const authClient = createAuthClient();
+  const { data, error } = await authClient.auth.refreshSession({
+    refresh_token: refreshToken,
+  });
+
+  if (error || !data.session) {
+    return { ok: false as const };
+  }
+
+  return {
+    ok: true as const,
+    access_token: data.session.access_token,
+    refresh_token: data.session.refresh_token,
+  };
+}
+
+export async function portalLogout(refreshToken: string) {
+  const authClient = createAuthClient();
+  const { data } = await authClient.auth.refreshSession({
+    refresh_token: refreshToken,
+  });
+
+  if (data.session) {
+    await authClient.auth.setSession({
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+    });
+    await authClient.auth.signOut();
+  }
+
+  return { ok: true as const };
+}
+
+export async function portalUpdateProfile(userId: string, fullName: string) {
+  const nameError = validateFullName(fullName);
+  if (nameError) return { ok: false as const, error: nameError };
+
+  const trimmedName = fullName.trim();
+  const { data, error } = await supabase.auth.admin.updateUserById(userId, {
+    user_metadata: { full_name: trimmedName },
+  });
+
+  if (error || !data.user) {
+    console.error("Profile update error:", error?.message);
+    return { ok: false as const, error: "Unable to update profile." };
+  }
+
+  const profile = await getProfile(userId, data.user.email ?? "");
+  if (!profile) {
+    return { ok: false as const, error: "Profile not found." };
+  }
+
+  return {
+    ok: true as const,
+    user: buildPortalUser(userId, profile, data.user.user_metadata),
+  };
+}
