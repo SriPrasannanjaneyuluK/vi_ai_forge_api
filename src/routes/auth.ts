@@ -107,7 +107,7 @@ authRouter.post("/signup", async (req, res) => {
 authRouter.post("/refresh", async (req, res) => {
   const refreshToken = readRefreshCookie(req);
   if (!refreshToken) {
-    res.status(401).json({ error: "No refresh session" });
+    res.status(204).end();
     return;
   }
 
